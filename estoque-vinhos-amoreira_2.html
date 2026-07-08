@@ -251,8 +251,17 @@ function onChange(id, field, value) {
 }
 
 function buildMessage() {
-  const pedir = items.filter(it => need(it) > 0);
   const unidade = getUnidade();
+
+  if (currentAba === "Cervejas") {
+    return "Sem mensagem automatica para esta categoria.";
+  }
+
+  let pedir = items.filter(it => need(it) > 0);
+  if (currentAba === "Nao Alcoolicos") {
+    pedir = pedir.filter(it => it.nome.toLowerCase().includes("agua"));
+  }
+
   let msg = "Bom dia, tudo joia?\n\nPrecisando fazer pedido de " + currentAba.toLowerCase() + ":\n\n";
   if (pedir.length === 0) {
     msg += "Estoque em dia, sem pedido no momento.";
