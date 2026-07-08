@@ -88,6 +88,7 @@
 
 <script>
 const URL_KEY = "vinhos-amoreira-script-url";
+const DEFAULT_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyFzvswR2N0bDgk4BEe-TH20Rmc8iSERdoCZNgbhH_l1zQvkjDHTI-f7_MEjtket45e-A/exec";
 const ABAS = [
   { id: "Vinhos", label: "Vinhos", unidade: "garrafas" },
   { id: "Cervejas", label: "Cervejas", unidade: "caixas" },
@@ -98,7 +99,7 @@ let items = [];
 let scriptUrl = "";
 
 function init() {
-  scriptUrl = localStorage.getItem(URL_KEY) || "";
+  scriptUrl = localStorage.getItem(URL_KEY) || DEFAULT_SCRIPT_URL;
   document.getElementById("script-url").value = scriptUrl;
   renderTabs();
   if (scriptUrl) {
