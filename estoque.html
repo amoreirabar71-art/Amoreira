@@ -131,7 +131,16 @@ function jsonp(url) {
   });
 }
 
-function getUnidade() {
+const GRUPO_UNIDADES = {
+  "Papelaria": "fardos",
+  "Produtos de Limpeza": "galoes",
+  "Descartaveis": "fardos"
+};
+
+function getUnidade(grupo) {
+  if (currentAba === "Materiais de Limpeza" && grupo && GRUPO_UNIDADES[grupo]) {
+    return GRUPO_UNIDADES[grupo];
+  }
   const aba = ABAS.find(a => a.id === currentAba);
   return aba ? aba.unidade : "unidades";
 }
@@ -173,7 +182,7 @@ function need(item) {
 function render() {
   const list = document.getElementById("list");
   const summary = document.getElementById("summary");
-  const unidade = getUnidade();
+  const unidadeResumo = getUnidade();
 
   const totalPedir = items.reduce((acc, it) => acc + need(it), 0);
   const itensAbaixo = items.filter(it => need(it) > 0).length;
@@ -181,7 +190,7 @@ function render() {
 
   summary.innerHTML =
     '<div style="background:var(--surface-1); border-radius:var(--radius); padding:1rem;">' +
-      '<div style="font-size:13px; color:var(--text-secondary);">' + (unidade.charAt(0).toUpperCase() + unidade.slice(1)) + ' a pedir</div>' +
+      '<div style="font-size:13px; color:var(--text-secondary);">Itens a pedir</div>' +
       '<div style="font-size:24px; font-weight:500; color:var(--text-danger);">' + totalPedir + '</div>' +
     '</div>' +
     '<div style="background:var(--surface-1); border-radius:var(--radius); padding:1rem;">' +
@@ -195,8 +204,8 @@ function render() {
 
   const groups = [...new Set(items.map(i => i.grupo))];
   list.innerHTML = groups.map(g =>
-    '<div style="font-size:13px; font-weight:500; color:var(--text-secondary); margin:8px 0 2px;">' + g + '</div>' +
-    items.filter(i => i.grupo === g).map(it => rowHtml(it, unidade)).join("")
+    '<div style="font-size:13px; font-weight:500; color:var(--text-secondary); margin:8px 0 2px;">' + g + ' <span style="font-weight:400; color:var(--text-muted);">(' + getUnidade(g) + ')</span></div>' +
+    items.filter(i => i.grupo === g).map(it => rowHtml(it, getUnidade(g))).join("")
   ).join("");
 
   items.forEach(it => {
@@ -245,44 +254,42 @@ const DRINKS_FORNECEDOR_ADEGA = [
   "Monin Maracuja", "Monin Tangerina", "Monin Maca Verde", "Monin Amora", "Campari", "Aperol"
 ];
 
-function formatMsg(pedir, unidade) {
+function formatMsg(pedir) {
   let msg = "Bom dia, tudo joia?\n\nPrecisando fazer pedido:\n\n";
   if (pedir.length === 0) {
     msg += "Estoque em dia, sem pedido no momento.";
   } else {
-    msg += pedir.map(it => "- " + it.nome + " — " + need(it) + " " + unidade).join("\n");
+    msg += pedir.map(it => "- " + it.nome + " — " + need(it) + " " + getUnidade(it.grupo)).join("\n");
     msg += "\n\nObrigado!";
   }
   return msg;
 }
 
 function buildMessageBlocks() {
-  const unidade = getUnidade();
-
   if (currentAba === "Cervejas") {
     return [{ label: null, text: "Sem mensagem automatica para esta categoria." }];
   }
 
   if (currentAba === "Vinhos") {
     const pedir = items.filter(it => need(it) > 0 && !it.nome.toLowerCase().startsWith("openwine"));
-    return [{ label: null, text: formatMsg(pedir, unidade) }];
+    return [{ label: null, text: formatMsg(pedir) }];
   }
 
   if (currentAba === "Nao Alcoolicos") {
     const pedir = items.filter(it => need(it) > 0 && it.nome.toLowerCase().includes("agua"));
-    return [{ label: null, text: formatMsg(pedir, unidade) }];
+    return [{ label: null, text: formatMsg(pedir) }];
   }
 
   if (currentAba === "Drinks") {
     const p1 = items.filter(it => need(it) > 0 && DRINKS_FORNECEDOR_LIMAO.includes(it.nome));
     const p2 = items.filter(it => need(it) > 0 && DRINKS_FORNECEDOR_ADEGA.includes(it.nome));
     return [
-      { label: "Distribuidora Limao", text: formatMsg(p1, unidade) },
-      { label: "Distribuidora Adega", text: formatMsg(p2, unidade) }
+      { label: "Distribuidora Limao", text: formatMsg(p1) },
+      { label: "Distribuidora Adega", text: formatMsg(p2) }
     ];
   }
 
-  return [{ label: null, text: formatMsg(items.filter(it => need(it) > 0), unidade) }];
+  return [{ label: null, text: formatMsg(items.filter(it => need(it) > 0)) }];
 }
 
 function renderMessages() {
