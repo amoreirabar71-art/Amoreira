@@ -74,11 +74,8 @@
   </div>
 
   <div style="margin-top:1.5rem; padding-top:1.25rem; border-top:0.5px solid var(--border);">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-      <div style="font-size:14px; font-weight:500;">Mensagem para pedido</div>
-      <button id="copy-btn">Copiar</button>
-    </div>
-    <pre id="msg-preview" style="white-space:pre-wrap; font-family:inherit; font-size:13px; color:var(--text-primary); background:var(--surface-1); border-radius:var(--radius); padding:0.75rem 1rem; margin:0;"></pre>
+    <div style="font-size:14px; font-weight:500; margin-bottom:8px;">Mensagem para pedido</div>
+    <div id="msg-container" style="display:flex; flex-direction:column; gap:12px;"></div>
   </div>
 
   <div style="margin-top:1rem; padding-top:1rem; border-top:0.5px solid var(--border); font-size:12px; color:var(--text-muted);">
@@ -92,6 +89,7 @@ const ABAS = [
   { id: "Vinhos", label: "Vinhos", unidade: "garrafas" },
   { id: "Cervejas", label: "Cervejas", unidade: "caixas" },
   { id: "Nao Alcoolicos", label: "Nao alcoolicos", unidade: "fardos" },
+  { id: "Drinks", label: "Drinks", unidade: "garrafas" },
   { id: "Materiais de Limpeza", label: "Limpeza", unidade: "unidades" }
 ];
 let currentAba = ABAS[0].id;
@@ -208,7 +206,7 @@ function render() {
     if (minInput) minInput.addEventListener("input", e => onChange(it.id, "min", e.target.value));
   });
 
-  document.getElementById("msg-preview").textContent = buildMessage();
+  renderMessages();
 }
 
 function rowHtml(it, unidade) {
@@ -239,22 +237,16 @@ function onChange(id, field, value) {
   render();
 }
 
-function buildMessage() {
-  const unidade = getUnidade();
+const DRINKS_FORNECEDOR_LIMAO = [
+  "Cordial de Hibisco", "Cordial de Cacau", "Cordial de Mate", "Jamesson", "Chivas",
+  "Vermuth Rosso", "Amburana 600ml", "Prata 600ml", "Balsamo 600ml", "Gin AMZ Litro", "Gin Jambu Lata"
+];
+const DRINKS_FORNECEDOR_ADEGA = [
+  "Monin Maracuja", "Monin Tangerina", "Monin Maca Verde", "Monin Amora", "Campari", "Aperol"
+];
 
-  if (currentAba === "Cervejas") {
-    return "Sem mensagem automatica para esta categoria.";
-  }
-
-  let pedir = items.filter(it => need(it) > 0);
-  if (currentAba === "Vinhos") {
-    pedir = pedir.filter(it => !it.nome.toLowerCase().startsWith("openwine"));
-  }
-  if (currentAba === "Nao Alcoolicos") {
-    pedir = pedir.filter(it => it.nome.toLowerCase().includes("agua"));
-  }
-
-  let msg = "Bom dia, tudo joia?\n\nPrecisando fazer pedido de " + currentAba.toLowerCase() + ":\n\n";
+function formatMsg(pedir, unidade) {
+  let msg = "Bom dia, tudo joia?\n\nPrecisando fazer pedido:\n\n";
   if (pedir.length === 0) {
     msg += "Estoque em dia, sem pedido no momento.";
   } else {
@@ -262,6 +254,62 @@ function buildMessage() {
     msg += "\n\nObrigado!";
   }
   return msg;
+}
+
+function buildMessageBlocks() {
+  const unidade = getUnidade();
+
+  if (currentAba === "Cervejas") {
+    return [{ label: null, text: "Sem mensagem automatica para esta categoria." }];
+  }
+
+  if (currentAba === "Vinhos") {
+    const pedir = items.filter(it => need(it) > 0 && !it.nome.toLowerCase().startsWith("openwine"));
+    return [{ label: null, text: formatMsg(pedir, unidade) }];
+  }
+
+  if (currentAba === "Nao Alcoolicos") {
+    const pedir = items.filter(it => need(it) > 0 && it.nome.toLowerCase().includes("agua"));
+    return [{ label: null, text: formatMsg(pedir, unidade) }];
+  }
+
+  if (currentAba === "Drinks") {
+    const p1 = items.filter(it => need(it) > 0 && DRINKS_FORNECEDOR_LIMAO.includes(it.nome));
+    const p2 = items.filter(it => need(it) > 0 && DRINKS_FORNECEDOR_ADEGA.includes(it.nome));
+    return [
+      { label: "Distribuidora Limao", text: formatMsg(p1, unidade) },
+      { label: "Distribuidora Adega", text: formatMsg(p2, unidade) }
+    ];
+  }
+
+  return [{ label: null, text: formatMsg(items.filter(it => need(it) > 0), unidade) }];
+}
+
+function renderMessages() {
+  const container = document.getElementById("msg-container");
+  const blocks = buildMessageBlocks();
+  container.innerHTML = blocks.map((b, i) =>
+    '<div>' +
+      (b.label ? '<div style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;">' + b.label + '</div>' : '') +
+      '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">' +
+        '<pre style="white-space:pre-wrap; font-family:inherit; font-size:13px; color:var(--text-primary); background:var(--surface-1); border-radius:var(--radius); padding:0.75rem 1rem; margin:0; flex:1;">' + b.text + '</pre>' +
+        '<button class="copy-msg-btn" data-idx="' + i + '" style="white-space:nowrap;">Copiar</button>' +
+      '</div>' +
+    '</div>'
+  ).join("");
+
+  container.querySelectorAll(".copy-msg-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      try {
+        await navigator.clipboard.writeText(blocks[idx].text);
+        btn.textContent = "Copiado";
+        setTimeout(() => { btn.textContent = "Copiar"; }, 1500);
+      } catch (e) {
+        console.error("Erro ao copiar", e);
+      }
+    });
+  });
 }
 
 document.getElementById("save-btn").addEventListener("click", async () => {
@@ -285,17 +333,6 @@ document.getElementById("pedido-btn").addEventListener("click", async () => {
   } catch (e) {
     setStatus("Erro ao registrar pedido. Tente novamente.");
     console.error(e);
-  }
-});
-
-document.getElementById("copy-btn").addEventListener("click", async () => {
-  const btn = document.getElementById("copy-btn");
-  try {
-    await navigator.clipboard.writeText(buildMessage());
-    btn.textContent = "Copiado";
-    setTimeout(() => { btn.textContent = "Copiar"; }, 1500);
-  } catch (e) {
-    console.error("Erro ao copiar", e);
   }
 });
 
