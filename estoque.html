@@ -86,11 +86,11 @@
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyFzvswR2N0bDgk4BEe-TH20Rmc8iSERdoCZNgbhH_l1zQvkjDHTI-f7_MEjtket45e-A/exec";
 const ABAS = [
-  { id: "Vinhos", label: "Vinhos", unidade: "garrafas" },
-  { id: "Cervejas", label: "Cervejas", unidade: "caixas" },
-  { id: "Nao Alcoolicos", label: "Nao alcoolicos", unidade: "fardos" },
-  { id: "Drinks", label: "Drinks", unidade: "garrafas" },
-  { id: "Materiais de Limpeza", label: "Limpeza", unidade: "unidades" }
+  { id: "Vinhos", label: "Vinhos" },
+  { id: "Cervejas", label: "Cervejas" },
+  { id: "Nao Alcoolicos", label: "Nao alcoolicos" },
+  { id: "Drinks", label: "Drinks" },
+  { id: "Materiais de Limpeza", label: "Limpeza" }
 ];
 let currentAba = ABAS[0].id;
 let items = [];
@@ -131,19 +131,7 @@ function jsonp(url) {
   });
 }
 
-const GRUPO_UNIDADES = {
-  "Papelaria": "fardos",
-  "Produtos de Limpeza": "galoes",
-  "Descartaveis": "fardos"
-};
 
-function getUnidade(grupo) {
-  if (currentAba === "Materiais de Limpeza" && grupo && GRUPO_UNIDADES[grupo]) {
-    return GRUPO_UNIDADES[grupo];
-  }
-  const aba = ABAS.find(a => a.id === currentAba);
-  return aba ? aba.unidade : "unidades";
-}
 
 async function loadFromSheet() {
   setStatus("Carregando " + currentAba + "...");
@@ -154,6 +142,7 @@ async function loadFromSheet() {
       id: "item-" + i,
       nome: it.produto,
       grupo: it.grupo || currentAba,
+      unidade: it.unidade || "unidades",
       min: Number(it.min) || 0,
       atual: Number(it.atual) || 0
     }));
@@ -182,7 +171,6 @@ function need(item) {
 function render() {
   const list = document.getElementById("list");
   const summary = document.getElementById("summary");
-  const unidadeResumo = getUnidade();
 
   const totalPedir = items.reduce((acc, it) => acc + need(it), 0);
   const itensAbaixo = items.filter(it => need(it) > 0).length;
@@ -204,8 +192,8 @@ function render() {
 
   const groups = [...new Set(items.map(i => i.grupo))];
   list.innerHTML = groups.map(g =>
-    '<div style="font-size:13px; font-weight:500; color:var(--text-secondary); margin:8px 0 2px;">' + g + ' <span style="font-weight:400; color:var(--text-muted);">(' + getUnidade(g) + ')</span></div>' +
-    items.filter(i => i.grupo === g).map(it => rowHtml(it, getUnidade(g))).join("")
+    '<div style="font-size:13px; font-weight:500; color:var(--text-secondary); margin:8px 0 2px;">' + g + '</div>' +
+    items.filter(i => i.grupo === g).map(it => rowHtml(it)).join("")
   ).join("");
 
   items.forEach(it => {
@@ -218,14 +206,14 @@ function render() {
   renderMessages();
 }
 
-function rowHtml(it, unidade) {
+function rowHtml(it) {
   const falta = need(it);
   const ok = falta === 0;
   return '<div style="display:flex; align-items:center; gap:12px; background:var(--surface-2); border:0.5px solid var(--border); border-radius:12px; padding:0.75rem 1rem;">' +
     '<div style="flex:1; min-width:0;">' +
       '<div style="font-size:14px; font-weight:500; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">' + it.nome + '</div>' +
       '<div style="font-size:12px; color:' + (ok ? 'var(--text-success)' : 'var(--text-danger)') + '; margin-top:2px;">' +
-        (ok ? 'Estoque ok' : ('Pedir ' + falta + ' ' + unidade)) +
+        (ok ? 'Estoque ok' : ('Pedir ' + falta + ' ' + it.unidade)) +
       '</div>' +
     '</div>' +
     '<div style="display:flex; align-items:center; gap:4px;">' +
@@ -259,7 +247,7 @@ function formatMsg(pedir) {
   if (pedir.length === 0) {
     msg += "Estoque em dia, sem pedido no momento.";
   } else {
-    msg += pedir.map(it => "- " + it.nome + " — " + need(it) + " " + getUnidade(it.grupo)).join("\n");
+    msg += pedir.map(it => "- " + it.nome + " — " + need(it) + " " + it.unidade).join("\n");
     msg += "\n\nObrigado!";
   }
   return msg;
