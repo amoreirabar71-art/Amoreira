@@ -143,6 +143,7 @@ async function loadFromSheet() {
       nome: it.produto,
       grupo: it.grupo || currentAba,
       unidade: it.unidade || "unidades",
+      fornecedor: it.fornecedor || "",
       min: Number(it.min) || 0,
       atual: Number(it.atual) || 0
     }));
@@ -215,6 +216,7 @@ function rowHtml(it) {
       '<div style="font-size:12px; color:' + (ok ? 'var(--text-success)' : 'var(--text-danger)') + '; margin-top:2px;">' +
         (ok ? 'Estoque ok' : ('Pedir ' + falta + ' ' + it.unidade)) +
       '</div>' +
+      (it.fornecedor ? '<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Fornecedor: ' + it.fornecedor + '</div>' : '') +
     '</div>' +
     '<div style="display:flex; align-items:center; gap:4px;">' +
       '<label style="font-size:11px; color:var(--text-muted);">Min</label>' +
@@ -234,14 +236,6 @@ function onChange(id, field, value) {
   render();
 }
 
-const DRINKS_FORNECEDOR_LIMAO = [
-  "Cordial Hibisco", "Cordial Cacau e Cumaru", "Cordial Mate", "Jameson", "Chivas",
-  "Vermouth", "Amburana", "Prata", "Balsamo", "Gin", "Gin Jambu"
-];
-const DRINKS_FORNECEDOR_ADEGA = [
-  "Monin Maracuja", "Monin Tangerina", "Monin Maca Verde", "Monin Amora", "Campari", "Aperol"
-];
-
 function formatMsg(pedir) {
   let msg = "Bom dia, tudo joia?\n\nPrecisando fazer pedido:\n\n";
   if (pedir.length === 0) {
@@ -253,31 +247,22 @@ function formatMsg(pedir) {
   return msg;
 }
 
+// Agrupa os itens que precisam de pedido pelo valor da coluna
+// "Fornecedor" na planilha. Itens sem fornecedor definido (celula
+// vazia) ficam de fora de qualquer mensagem - pedido feito por
+// aplicativo ou outro meio, sem geracao automatica de texto.
 function buildMessageBlocks() {
-  if (currentAba === "Cervejas") {
-    return [{ label: null, text: "Sem mensagem automatica para esta categoria." }];
+  const pedir = items.filter(it => need(it) > 0 && it.fornecedor && it.fornecedor.trim() !== "");
+
+  if (pedir.length === 0) {
+    return [{ label: null, text: "Nenhum fornecedor configurado para pedido automatico nesta aba no momento (ou estoque em dia)." }];
   }
 
-  if (currentAba === "Vinhos") {
-    const pedir = items.filter(it => need(it) > 0 && !it.nome.toLowerCase().startsWith("openwine"));
-    return [{ label: null, text: formatMsg(pedir) }];
-  }
-
-  if (currentAba === "Nao Alcoolicos") {
-    const pedir = items.filter(it => need(it) > 0 && it.nome.toLowerCase().includes("agua"));
-    return [{ label: null, text: formatMsg(pedir) }];
-  }
-
-  if (currentAba === "Drinks") {
-    const p1 = items.filter(it => need(it) > 0 && DRINKS_FORNECEDOR_LIMAO.includes(it.nome));
-    const p2 = items.filter(it => need(it) > 0 && DRINKS_FORNECEDOR_ADEGA.includes(it.nome));
-    return [
-      { label: "Distribuidora Limao", text: formatMsg(p1) },
-      { label: "Distribuidora Adega", text: formatMsg(p2) }
-    ];
-  }
-
-  return [{ label: null, text: formatMsg(items.filter(it => need(it) > 0)) }];
+  const fornecedores = [...new Set(pedir.map(it => it.fornecedor))];
+  return fornecedores.map(f => ({
+    label: f,
+    text: formatMsg(pedir.filter(it => it.fornecedor === f))
+  }));
 }
 
 function renderMessages() {
