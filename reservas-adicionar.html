@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Adicionar Reserva — Amoreira</title>
+<title>Ver Reservas — Amoreira</title>
 <style>
   :root {
     --surface-0: #FAF9F6;
@@ -12,11 +12,8 @@
     --text-primary: #2C2C2A;
     --text-secondary: #5F5E5A;
     --text-muted: #888780;
-    --text-success: #3B6D11;
+    --text-danger: #A32D2D;
     --border: #D3D1C7;
-    --border-accent: #185FA5;
-    --text-accent: #185FA5;
-    --radius: 8px;
   }
   * { box-sizing: border-box; }
   body {
@@ -26,30 +23,13 @@
     margin: 0;
     padding: 2rem 1rem;
   }
-  label {
-    font-size: 12px;
-    color: var(--text-secondary);
-    display: block;
-    margin-bottom: 4px;
-  }
-  input {
-    width: 100%;
-    font-family: inherit;
-    font-size: 14px;
-    border-radius: var(--radius);
-    border: 0.5px solid var(--border);
-    padding: 8px 10px;
-    margin-bottom: 1rem;
-  }
   button {
     font-family: inherit;
-    font-size: 14px;
-    border-radius: var(--radius);
-    border: 0.5px solid var(--border-accent);
-    color: var(--text-accent);
+    font-size: 13px;
+    border-radius: 8px;
+    border: 0.5px solid var(--border);
     background: var(--surface-2);
-    padding: 10px 14px;
-    width: 100%;
+    padding: 6px 12px;
     cursor: pointer;
   }
   button:hover { background: var(--surface-1); }
@@ -60,49 +40,30 @@
     display: inline-block;
     margin-bottom: 1rem;
   }
-  #confirmacao {
-    display: none;
-    font-size: 13px;
-    color: var(--text-success);
-    background: var(--surface-1);
-    border-radius: var(--radius);
-    padding: 0.75rem 1rem;
-    margin-bottom: 1rem;
+  .section-title {
+    font-size: 14px;
+    font-weight: 500;
+    margin: 1.5rem 0 8px;
   }
 </style>
 </head>
 <body>
 
-<div style="max-width: 420px; margin: 0 auto;">
+<div style="max-width: 680px; margin: 0 auto;">
   <a class="back-link" href="index.html">&larr; Voltar</a>
-  <h1 style="font-size: 22px; font-weight: 500; margin-bottom: 4px;">Adicionar reserva</h1>
-  <p style="font-size:13px; color:var(--text-secondary); margin-top:0; margin-bottom: 1.5rem;">Preencha os dados da reserva</p>
+  <h1 style="font-size: 22px; font-weight: 500; margin-bottom: 4px;">Reservas — Amoreira</h1>
+  <p id="status-line" style="font-size:13px; color:var(--text-secondary); margin-top:0;">Carregando reservas...</p>
 
-  <div id="confirmacao"></div>
+  <div class="section-title">Esta semana (segunda a domingo)</div>
+  <div id="lista-semana" style="display:flex; flex-direction:column; gap:8px;"></div>
 
-  <label for="nome">Nome</label>
-  <input id="nome" type="text" placeholder="Nome do cliente">
-
-  <label for="telefone">Telefone</label>
-  <input id="telefone" type="text" placeholder="(00) 00000-0000">
-
-  <label for="data">Data</label>
-  <input id="data" type="date">
-
-  <label for="horario">Horario</label>
-  <input id="horario" type="time">
-
-  <label for="pessoas">Numero de pessoas</label>
-  <input id="pessoas" type="number" min="1" placeholder="Ex: 4">
-
-  <label for="obs">Observacoes (opcional)</label>
-  <input id="obs" type="text" placeholder="Ex: mesa perto da janela">
-
-  <button id="add-btn">Adicionar reserva</button>
+  <div class="section-title">Proximas reservas</div>
+  <div id="lista-proximas" style="display:flex; flex-direction:column; gap:8px;"></div>
 </div>
 
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyFzvswR2N0bDgk4BEe-TH20Rmc8iSERdoCZNgbhH_l1zQvkjDHTI-f7_MEjtket45e-A/exec";
+let reservas = [];
 
 function jsonp(url) {
   return new Promise((resolve, reject) => {
@@ -121,42 +82,130 @@ function jsonp(url) {
   });
 }
 
-function mostrarConfirmacao(msg, cor) {
-  const el = document.getElementById("confirmacao");
-  el.textContent = msg;
-  el.style.display = "block";
-  el.style.color = cor || "var(--text-success)";
+function setStatus(msg) {
+  document.getElementById("status-line").textContent = msg;
 }
 
-document.getElementById("add-btn").addEventListener("click", async () => {
-  const nome = document.getElementById("nome").value.trim();
-  const telefone = document.getElementById("telefone").value.trim();
-  const data = document.getElementById("data").value;
-  const horario = document.getElementById("horario").value;
-  const pessoas = document.getElementById("pessoas").value;
-  const obs = document.getElementById("obs").value.trim();
+function hoje() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
-  if (!nome || !data || !horario || !pessoas) {
-    mostrarConfirmacao("Preencha nome, data, horario e numero de pessoas.", "var(--text-danger)");
+function segundaDaSemana(base) {
+  const d = new Date(base);
+  const dia = d.getDay();
+  const diff = (dia === 0 ? -6 : 1) - dia;
+  d.setDate(d.getDate() + diff);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+function domingoDaSemana(segunda) {
+  const d = new Date(segunda);
+  d.setDate(d.getDate() + 6);
+  d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+function parseData(str) {
+  if (!str) return null;
+  const partes = String(str).split(/[-\/]/);
+  if (partes[0].length === 4) {
+    return new Date(Number(partes[0]), Number(partes[1]) - 1, Number(partes[2]));
+  }
+  return new Date(Number(partes[2]), Number(partes[1]) - 1, Number(partes[0]));
+}
+
+function formatarData(d) {
+  if (!d) return "";
+  const dias = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
+  return dias[d.getDay()] + " " + String(d.getDate()).padStart(2, "0") + "/" + String(d.getMonth() + 1).padStart(2, "0");
+}
+
+async function carregarReservas() {
+  setStatus("Carregando reservas...");
+  try {
+    reservas = await jsonp(SCRIPT_URL + "?action=reservas_list");
+    render();
+  } catch (e) {
+    setStatus("Nao foi possivel carregar as reservas.");
+    console.error(e);
+  }
+}
+
+function render() {
+  const inicioSemana = segundaDaSemana(hoje());
+  const fimSemana = domingoDaSemana(inicioSemana);
+
+  const comData = reservas
+    .map(r => ({ ...r, dataObj: parseData(r.data) }))
+    .filter(r => r.dataObj && r.status !== "Compareceu");
+
+  const daSemana = comData
+    .filter(r => r.dataObj >= inicioSemana && r.dataObj <= fimSemana)
+    .sort((a, b) => a.dataObj - b.dataObj || String(a.horario).localeCompare(String(b.horario)));
+
+  const proximas = comData
+    .filter(r => r.dataObj > fimSemana)
+    .sort((a, b) => a.dataObj - b.dataObj || String(a.horario).localeCompare(String(b.horario)));
+
+  setStatus(daSemana.length + " reserva(s) esta semana, " + proximas.length + " proxima(s)");
+
+  renderLista("lista-semana", daSemana, "Nenhuma reserva para esta semana.");
+  renderLista("lista-proximas", proximas, "Nenhuma reserva futura cadastrada.");
+}
+
+function renderLista(idContainer, lista, textoVazio) {
+  const el = document.getElementById(idContainer);
+  if (lista.length === 0) {
+    el.innerHTML = '<div style="font-size:13px; color:var(--text-muted); padding:1rem; text-align:center; background:var(--surface-1); border-radius:8px;">' + textoVazio + '</div>';
     return;
   }
 
-  const payload = JSON.stringify({ nome, data, horario, pessoas, telefone, observacoes: obs });
-  mostrarConfirmacao("Salvando...");
-  try {
-    await jsonp(SCRIPT_URL + "?action=reservas_add&payload=" + encodeURIComponent(payload));
-    mostrarConfirmacao("Reserva adicionada com sucesso!");
-    document.getElementById("nome").value = "";
-    document.getElementById("telefone").value = "";
-    document.getElementById("data").value = "";
-    document.getElementById("horario").value = "";
-    document.getElementById("pessoas").value = "";
-    document.getElementById("obs").value = "";
-  } catch (e) {
-    mostrarConfirmacao("Erro ao adicionar reserva. Tente novamente.", "var(--text-danger)");
-    console.error(e);
-  }
-});
+  el.innerHTML = lista.map(r => `
+    <div style="display:flex; align-items:center; gap:12px; background:var(--surface-2); border:0.5px solid var(--border); border-radius:12px; padding:0.75rem 1rem;">
+      <div style="text-align:center; min-width:56px;">
+        <div style="font-size:14px; font-weight:500;">${formatarData(r.dataObj)}</div>
+        <div style="font-size:11px; color:var(--text-secondary);">${r.horario || ""}</div>
+      </div>
+      <div style="flex:1; min-width:0;">
+        <div style="font-size:14px; font-weight:500;">${r.nome}</div>
+        <div style="font-size:12px; color:var(--text-secondary);">${r.pessoas || "?"} pessoas ${r.telefone ? "— " + r.telefone : ""}</div>
+        ${r.observacoes ? '<div style="font-size:12px; color:var(--text-muted); margin-top:2px;">' + r.observacoes + '</div>' : ""}
+      </div>
+      <div style="display:flex; flex-direction:column; gap:4px;">
+        <button data-linha="${r.linha}" class="chegou-btn" style="color:var(--text-success); border-color:var(--text-success); font-size:12px;">Reserva chegou</button>
+        <button data-linha="${r.linha}" class="del-btn" style="color:var(--text-danger); border-color:var(--text-danger); font-size:12px;">Excluir</button>
+      </div>
+    </div>
+  `).join("");
+
+  el.querySelectorAll(".del-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Excluir esta reserva? Ela sera apagada tambem da planilha.")) return;
+      try {
+        await jsonp(SCRIPT_URL + "?action=reservas_delete&linha=" + btn.dataset.linha);
+        await carregarReservas();
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  });
+
+  el.querySelectorAll(".chegou-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      try {
+        await jsonp(SCRIPT_URL + "?action=reservas_chegou&linha=" + btn.dataset.linha);
+        await carregarReservas();
+      } catch (e) {
+        console.error(e);
+      }
+    });
+  });
+}
+
+carregarReservas();
 </script>
 </body>
 </html>
