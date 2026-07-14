@@ -251,13 +251,14 @@ function buildMessageBlocks() {
   const pedir = items.filter(it => need(it) > 0 && it.fornecedor && it.fornecedor.trim() !== "");
 
   if (pedir.length === 0) {
-    return [{ label: null, text: "Nenhum fornecedor configurado para pedido automatico nesta aba no momento (ou estoque em dia)." }];
+    return [{ label: null, text: "Nenhum fornecedor configurado para pedido automatico nesta aba no momento (ou estoque em dia).", items: [] }];
   }
 
   const fornecedores = [...new Set(pedir.map(it => it.fornecedor))];
   return fornecedores.map(f => ({
     label: f,
-    text: formatMsg(pedir.filter(it => it.fornecedor === f))
+    text: formatMsg(pedir.filter(it => it.fornecedor === f)),
+    items: pedir.filter(it => it.fornecedor === f)
   }));
 }
 
@@ -269,7 +270,10 @@ function renderMessages() {
       (b.label ? '<div style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;">' + b.label + '</div>' : '') +
       '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">' +
         '<pre style="white-space:pre-wrap; font-family:inherit; font-size:13px; color:var(--text-primary); background:var(--surface-1); border-radius:var(--radius); padding:0.75rem 1rem; margin:0; flex:1;">' + b.text + '</pre>' +
-        '<button class="copy-msg-btn" data-idx="' + i + '" style="white-space:nowrap;">Copiar</button>' +
+        '<div style="display:flex; flex-direction:column; gap:4px;">' +
+          '<button class="copy-msg-btn" data-idx="' + i + '" style="white-space:nowrap;">Copiar</button>' +
+          (b.items.length > 0 ? '<button class="pedido-msg-btn" data-idx="' + i + '" style="white-space:nowrap; border-color:var(--border-accent); color:var(--text-accent);">Fazer pedido</button>' : '') +
+        '</div>' +
       '</div>' +
     '</div>'
   ).join("");
@@ -283,6 +287,23 @@ function renderMessages() {
         setTimeout(() => { btn.textContent = "Copiar"; }, 1500);
       } catch (e) {
         console.error("Erro ao copiar", e);
+      }
+    });
+  });
+
+  container.querySelectorAll(".pedido-msg-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      const idsDoBloco = new Set(blocks[idx].items.map(it => it.id));
+      items = items.map(it => idsDoBloco.has(it.id) ? { ...it, atual: it.min } : it);
+      render();
+      setStatus("Registrando pedido na planilha...");
+      try {
+        await pushToSheet(items);
+        setStatus("Pedido registrado — estoque atualizado na planilha");
+      } catch (e) {
+        setStatus("Erro ao registrar pedido. Tente novamente.");
+        console.error(e);
       }
     });
   });
