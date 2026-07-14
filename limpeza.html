@@ -69,11 +69,8 @@
   </div>
 
   <div style="margin-top:1.5rem; padding-top:1.25rem; border-top:0.5px solid var(--border);">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-      <div style="font-size:14px; font-weight:500;">Mensagem para pedido</div>
-      <button id="copy-btn">Copiar</button>
-    </div>
-    <pre id="msg-preview" style="white-space:pre-wrap; font-family:inherit; font-size:13px; color:var(--text-primary); background:var(--surface-1); border-radius:var(--radius); padding:0.75rem 1rem; margin:0;"></pre>
+    <div style="font-size:14px; font-weight:500; margin-bottom:8px;">Mensagem para pedido</div>
+    <div id="msg-container" style="display:flex; flex-direction:column; gap:12px;"></div>
   </div>
 </div>
 
@@ -109,6 +106,7 @@ async function loadFromSheet() {
       nome: it.produto,
       grupo: it.grupo || ABA,
       unidade: it.unidade || "unidades",
+      fornecedor: it.fornecedor || "",
       min: Number(it.min) || 0,
       atual: Number(it.atual) || 0
     }));
@@ -163,7 +161,7 @@ function render() {
     if (atualInput) atualInput.addEventListener("input", e => onChange(it.id, "atual", e.target.value));
   });
 
-  document.getElementById("msg-preview").textContent = buildMessage();
+  renderMessages();
 }
 
 function rowHtml(it) {
@@ -190,8 +188,7 @@ function onChange(id, field, value) {
   render();
 }
 
-function buildMessage() {
-  const pedir = items.filter(it => need(it) > 0);
+function formatMsg(pedir) {
   let msg = "Bom dia, segue o pedido para a semana:\n\n";
   if (pedir.length === 0) {
     msg += "Estoque em dia, sem pedido no momento.";
@@ -202,6 +199,72 @@ function buildMessage() {
   return msg;
 }
 
+// Agrupa os itens que precisam de pedido pelo valor da coluna
+// "Fornecedor" na planilha. Itens sem fornecedor definido (celula
+// vazia) ficam de fora de qualquer mensagem - pedido feito por
+// aplicativo ou outro meio, sem geracao automatica de texto.
+function buildMessageBlocks() {
+  const pedir = items.filter(it => need(it) > 0 && it.fornecedor && it.fornecedor.trim() !== "");
+
+  if (pedir.length === 0) {
+    return [{ label: null, text: "Nenhum fornecedor configurado para pedido automatico no momento (ou estoque em dia).", items: [] }];
+  }
+
+  const fornecedores = [...new Set(pedir.map(it => it.fornecedor))];
+  return fornecedores.map(f => ({
+    label: f,
+    text: formatMsg(pedir.filter(it => it.fornecedor === f)),
+    items: pedir.filter(it => it.fornecedor === f)
+  }));
+}
+
+function renderMessages() {
+  const container = document.getElementById("msg-container");
+  const blocks = buildMessageBlocks();
+  container.innerHTML = blocks.map((b, i) =>
+    '<div>' +
+      (b.label ? '<div style="font-size:12px; color:var(--text-secondary); margin-bottom:4px;">' + b.label + '</div>' : '') +
+      '<div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">' +
+        '<pre style="white-space:pre-wrap; font-family:inherit; font-size:13px; color:var(--text-primary); background:var(--surface-1); border-radius:var(--radius); padding:0.75rem 1rem; margin:0; flex:1;">' + b.text + '</pre>' +
+        '<div style="display:flex; flex-direction:column; gap:4px;">' +
+          '<button class="copy-msg-btn" data-idx="' + i + '" style="white-space:nowrap;">Copiar</button>' +
+          (b.items.length > 0 ? '<button class="pedido-msg-btn" data-idx="' + i + '" style="white-space:nowrap; border-color:var(--border-accent); color:var(--text-accent);">Fazer pedido</button>' : '') +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  ).join("");
+
+  container.querySelectorAll(".copy-msg-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      try {
+        await navigator.clipboard.writeText(blocks[idx].text);
+        btn.textContent = "Copiado";
+        setTimeout(() => { btn.textContent = "Copiar"; }, 1500);
+      } catch (e) {
+        console.error("Erro ao copiar", e);
+      }
+    });
+  });
+
+  container.querySelectorAll(".pedido-msg-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const idx = Number(btn.dataset.idx);
+      const idsDoBloco = new Set(blocks[idx].items.map(it => it.id));
+      items = items.map(it => idsDoBloco.has(it.id) ? { ...it, atual: it.min } : it);
+      render();
+      setStatus("Registrando pedido na planilha...");
+      try {
+        await pushToSheet(items);
+        setStatus("Pedido registrado — estoque atualizado na planilha");
+      } catch (e) {
+        setStatus("Erro ao registrar pedido. Tente novamente.");
+        console.error(e);
+      }
+    });
+  });
+}
+
 document.getElementById("save-btn").addEventListener("click", async () => {
   setStatus("Salvando na planilha...");
   try {
@@ -210,17 +273,6 @@ document.getElementById("save-btn").addEventListener("click", async () => {
   } catch (e) {
     setStatus("Erro ao salvar. Tente novamente.");
     console.error(e);
-  }
-});
-
-document.getElementById("copy-btn").addEventListener("click", async () => {
-  const btn = document.getElementById("copy-btn");
-  try {
-    await navigator.clipboard.writeText(buildMessage());
-    btn.textContent = "Copiado";
-    setTimeout(() => { btn.textContent = "Copiar"; }, 1500);
-  } catch (e) {
-    console.error("Erro ao copiar", e);
   }
 });
 
