@@ -73,7 +73,6 @@
 
   <div style="display:flex; gap:8px; margin-top:1.25rem;">
     <button id="save-btn" style="flex:1;">Salvar alteracoes</button>
-    <button id="pedido-btn" style="flex:1; border-color:var(--border-accent); color:var(--text-accent);">Fazer pedido</button>
   </div>
 
   <div style="margin-top:1.5rem; padding-top:1.25rem; border-top:0.5px solid var(--border);">
@@ -202,9 +201,7 @@ function render() {
 
   items.forEach(it => {
     const atualInput = document.getElementById("atual-" + it.id);
-    const minInput = document.getElementById("min-" + it.id);
     if (atualInput) atualInput.addEventListener("input", e => onChange(it.id, "atual", e.target.value));
-    if (minInput) minInput.addEventListener("input", e => onChange(it.id, "min", e.target.value));
   });
 
   renderMessages();
@@ -222,12 +219,8 @@ function rowHtml(it) {
       (it.fornecedor ? '<div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Fornecedor: ' + it.fornecedor + '</div>' : '') +
     '</div>' +
     '<div style="display:flex; align-items:center; gap:4px;">' +
-      '<label style="font-size:11px; color:var(--text-muted);">Min</label>' +
-      '<input type="number" min="0" id="min-' + it.id + '" value="' + it.min + '" style="width:52px; text-align:center;">' +
-    '</div>' +
-    '<div style="display:flex; align-items:center; gap:4px;">' +
       '<label style="font-size:11px; color:var(--text-muted);">Atual</label>' +
-      '<input type="number" min="0" id="atual-' + it.id + '" value="' + it.atual + '" style="width:52px; text-align:center;">' +
+      '<input type="number" min="0" id="atual-' + it.id + '" value="' + it.atual + '" style="width:52px; text-align:center;" onfocus="this.select()">' +
     '</div>' +
   '</div>';
 }
@@ -302,19 +295,6 @@ document.getElementById("save-btn").addEventListener("click", async () => {
     setStatus("Alteracoes salvas na planilha");
   } catch (e) {
     setStatus("Erro ao salvar. Tente novamente.");
-    console.error(e);
-  }
-});
-
-document.getElementById("pedido-btn").addEventListener("click", async () => {
-  items = items.map(it => need(it) > 0 ? { ...it, atual: it.min } : it);
-  render();
-  setStatus("Registrando pedido na planilha...");
-  try {
-    await pushToSheet(items);
-    setStatus("Pedido registrado — estoque atualizado na planilha");
-  } catch (e) {
-    setStatus("Erro ao registrar pedido. Tente novamente.");
     console.error(e);
   }
 });
